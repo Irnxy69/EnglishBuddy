@@ -34,14 +34,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-speech-recognition",
-        {
-          "microphonePermission": "EnglishBuddy needs microphone access to record your speech.",
-          "speechRecognitionPermission": "EnglishBuddy uses speech recognition to transcribe your English."
-        }
-      ]
+      "expo-router"
     ],
     "scheme": "englishbuddy"
   }
