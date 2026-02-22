@@ -32,8 +32,8 @@ sudo apt install -y -q nginx python3.12 python3.12-venv python3-pip git curl
 # 安装 Node.js 20
 if ! command -v node &> /dev/null; then
     log "安装 Node.js 20..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - -q
-    sudo apt install -y -q nodejs
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
 fi
 
 # 安装 PM2
