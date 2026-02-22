@@ -10,7 +10,7 @@ set -e  # 任何命令失败就停止
 APP_DIR="/home/ubuntu/englishbuddy"
 BACKEND_DIR="$APP_DIR/backend"
 FRONTEND_DIR="$APP_DIR/frontend"
-REPO_URL="https://github.com/你的GitHub用户名/EnglishBuddy.git"  # ← 替换
+REPO_URL="https://github.com/Irnxy69/EnglishBuddy.git"
 SERVER_IP=$(curl -s ifconfig.me)
 
 GREEN='\033[0;32m'
