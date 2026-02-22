@@ -9,6 +9,8 @@ class Settings(BaseSettings):
 
     # Groq (Whisper)
     groq_api_key: str
+    # 设置 Cloudflare Worker 代理 URL 以绕过 GFW 封锁；默认直连 Groq
+    groq_base_url: str = "https://api.groq.com"
 
     # Supabase
     supabase_url: str
