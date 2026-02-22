@@ -11,6 +11,7 @@ APP_DIR="/home/ubuntu/Projects/englishbuddy"
 BACKEND_DIR="$APP_DIR/backend"
 FRONTEND_DIR="$APP_DIR/frontend"
 REPO_URL="https://github.com/Irnxy69/EnglishBuddy.git"
+DOMAIN="englishbuddy.top"
 SERVER_IP=$(curl -s ifconfig.me)
 
 GREEN='\033[0;32m'
@@ -102,6 +103,9 @@ cd "$FRONTEND_DIR"
 # 设置 API URL 指向本机
 echo "NEXT_PUBLIC_API_URL=http://$SERVER_IP" > .env.production.local
 
+# 设置 API URL（优先用 HTTPS 域名）
+echo "NEXT_PUBLIC_API_URL=https://$DOMAIN" > .env.production.local
+
 log "安装 Node.js 依赖..."
 npm install --silent
 
@@ -119,7 +123,7 @@ log "配置 Nginx..."
 sudo tee /etc/nginx/sites-available/englishbuddy > /dev/null <<EOF
 server {
     listen 80;
-    server_name $SERVER_IP _;
+    server_name $DOMAIN www.$DOMAIN;
 
     # 后端 API
     location /api/ {
@@ -151,9 +155,19 @@ server {
 EOF
 
 sudo ln -sf /etc/nginx/sites-available/englishbuddy /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default  # 移除默认配置
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl restart nginx
 log "Nginx 配置完成"
+
+# ── 5.5 申请 HTTPS 证书 ──────────────────────────────────────────────────────
+if command -v certbot &> /dev/null && ping -c1 $DOMAIN &>/dev/null; then
+    log "申请 Let's Encrypt SSL 证书..."
+    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos -m admin@$DOMAIN --redirect
+    log "HTTPS 证书配置完成"
+else
+    warn "certbot 未安装或域名尚未解析，跳过 HTTPS 配置"
+    warn "手动执行: sudo apt install certbot python3-certbot-nginx -y && sudo certbot --nginx -d $DOMAIN"
+fi
 
 # ── 6. 配置 PM2 开机自启 ──────────────────────────────────────────────────────
 pm2 startup | tail -1 | sudo bash || true
@@ -163,8 +177,7 @@ echo ""
 echo -e "${GREEN}================================${NC}"
 echo -e "${GREEN}  🎉 部署完成！${NC}"
 echo -e "${GREEN}================================${NC}"
-echo -e "  网页访问: http://$SERVER_IP"
-echo -e "  API 文档: http://$SERVER_IP/api/docs   (注: 需后端开启)"
+echo -e "  网页访问: https://$DOMAIN"
 echo -e "  后端状态: sudo systemctl status englishbuddy-api"
 echo -e "  前端状态: pm2 status"
 echo -e "  Nginx 日志: sudo tail -f /var/log/nginx/error.log"
