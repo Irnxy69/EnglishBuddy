@@ -28,7 +28,16 @@ echo -e "\n🚀 EnglishBuddy 部署开始...\n"
 # ── 1. 安装系统依赖 ───────────────────────────────────────────────────────────
 log "安装系统依赖..."
 sudo apt update -q
-sudo apt install -y -q nginx python3.12 python3.12-venv python3-pip git curl
+sudo apt install -y -q nginx git curl software-properties-common
+
+# 安装 Python 3.12（通过 deadsnakes PPA，兼容所有 Ubuntu 版本）
+if ! command -v python3.12 &> /dev/null; then
+    log "添加 deadsnakes PPA 并安装 Python 3.12..."
+    sudo add-apt-repository -y ppa:deadsnakes/ppa
+    sudo apt update -q
+    sudo apt install -y -q python3.12 python3.12-venv
+fi
+sudo apt install -y -q python3-pip
 
 # 安装 Node.js 20
 if ! command -v node &> /dev/null; then
@@ -68,9 +77,7 @@ if [ ! -d "venv" ]; then
 fi
 
 log "安装 Python 依赖..."
-venv/bin/pip install --quiet -r requirements.txt "pydantic[email]" \
-    -i https://pypi.tuna.tsinghua.edu.cn/simple \
-    --trusted-host pypi.tuna.tsinghua.edu.cn
+venv/bin/pip install -r requirements.txt "pydantic[email]" --quiet
 
 # 创建 systemd 服务
 log "配置后端系统服务..."
@@ -100,10 +107,7 @@ log "后端服务启动完成"
 log "配置前端..."
 cd "$FRONTEND_DIR"
 
-# 设置 API URL 指向本机
-echo "NEXT_PUBLIC_API_URL=http://$SERVER_IP" > .env.production.local
-
-# 设置 API URL（优先用 HTTPS 域名）
+# 设置 API URL（HTTPS 域名）
 echo "NEXT_PUBLIC_API_URL=https://$DOMAIN" > .env.production.local
 
 log "安装 Node.js 依赖..."
