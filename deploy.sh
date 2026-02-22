@@ -7,7 +7,7 @@
 set -e  # 任何命令失败就停止
 
 # ── 配置 ─────────────────────────────────────────────────────────────────────
-APP_DIR="/home/ubuntu/englishbuddy"
+APP_DIR="/home/ubuntu/Projects/englishbuddy"
 BACKEND_DIR="$APP_DIR/backend"
 FRONTEND_DIR="$APP_DIR/frontend"
 REPO_URL="https://github.com/Irnxy69/EnglishBuddy.git"
