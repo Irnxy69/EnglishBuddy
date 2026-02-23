@@ -20,11 +20,11 @@ struct PracticeSession: Decodable, Identifiable {
 
 struct CreateSessionResponse: Decodable {
     let sessionId: String
-    let message: String
+    let mode: String
     
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case message
+        case mode
     }
 }
 
