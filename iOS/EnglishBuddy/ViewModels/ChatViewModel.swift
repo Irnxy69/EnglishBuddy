@@ -56,21 +56,27 @@ class ChatViewModel: ObservableObject {
         isAIThinking = false
     }
     
-    func toggleRecording() {
-        if speechRecognizer.isRecording {
-            // Stop recording and send message
-            speechRecognizer.stopTranscribing()
-            let userText = speechRecognizer.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+    func startRecording() {
+        error = nil
+        tts.stop()
+        speechRecognizer.startTranscribing()
+    }
+    
+    func stopRecordingAndSend() {
+        speechRecognizer.stopTranscribing()
+        
+        // Wait 0.5 seconds for final transcripts to process, then send
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            let userText = self.speechRecognizer.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
             if !userText.isEmpty {
                 Task {
-                    await sendMessage(text: userText)
+                    await self.sendMessage(text: userText)
                 }
+            } else {
+                // If empty after 0.5s, just clear everything
+                self.speechRecognizer.transcript = ""
             }
-        } else {
-            // Start recording
-            error = nil
-            tts.stop()
-            speechRecognizer.startTranscribing()
         }
     }
     

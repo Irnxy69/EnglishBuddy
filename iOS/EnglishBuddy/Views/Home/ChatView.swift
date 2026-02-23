@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ChatView: View {
     @StateObject private var vm = ChatViewModel()
@@ -140,9 +141,11 @@ struct ChatView: View {
                             }
                         } else {
                             // Voice Record Button (visible if empty)
-                            RecordButton(isRecording: vm.speechRecognizer.isRecording) {
-                                vm.toggleRecording()
-                            }
+                            RecordButton(
+                                isRecording: vm.speechRecognizer.isRecording,
+                                onTouchDown: { vm.startRecording() },
+                                onTouchUp: { vm.stopRecordingAndSend() }
+                            )
                         }
                     }
                     .padding()
@@ -218,21 +221,36 @@ struct MessageBubble: View {
 
 struct RecordButton: View {
     let isRecording: Bool
-    let action: () -> Void
+    let onTouchDown: () -> Void
+    let onTouchUp: () -> Void
+    
+    @State private var isPressed = false
     
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle()
-                    .fill(isRecording ? Color.red : Color.indigo)
-                    .frame(width: 44, height: 44)
-                
-                Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                    .foregroundColor(.white)
-                    .font(.system(size: 20, weight: .semibold))
-            }
+        ZStack {
+            Circle()
+                .fill(isPressed || isRecording ? Color.red : Color.indigo)
+                .frame(width: 50, height: 50)
+            
+            Image(systemName: isPressed || isRecording ? "waveform" : "mic.fill")
+                .foregroundColor(.white)
+                .font(.system(size: 24, weight: .semibold))
         }
-        .scaleEffect(isRecording ? 1.1 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isRecording)
+        .scaleEffect(isPressed || isRecording ? 1.3 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed || isRecording)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        isPressed = true
+                        onTouchDown()
+                    }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                    onTouchUp()
+                }
+        )
     }
 }
