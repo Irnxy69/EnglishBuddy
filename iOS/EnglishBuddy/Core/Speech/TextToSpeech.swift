@@ -15,7 +15,7 @@ class TextToSpeech: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     
     private func setupAudioSession() {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             print("Failed to set up audio session for TTS: \(error)")

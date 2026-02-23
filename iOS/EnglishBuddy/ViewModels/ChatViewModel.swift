@@ -7,6 +7,7 @@ class ChatViewModel: ObservableObject {
     @Published var currentSessionId: String?
     @Published var isAIThinking = false
     @Published var error: String?
+    @Published var currentMode: String = "ielts"
     
     @Published var showReport = false
     @Published var currentReport: String?
@@ -38,6 +39,7 @@ class ChatViewModel: ObservableObject {
         currentSessionId = nil
         error = nil
         isAIThinking = true
+        self.currentMode = mode
         
         do {
             let body = ["mode": mode]
@@ -84,7 +86,7 @@ class ChatViewModel: ObservableObject {
         do {
             // Context window: send all previous messages except the new one we just appended
             let historyToSend = Array(messages.dropLast())
-            let body = ChatRequest(text: text, history: historyToSend, mode: "ielts") // mode isn't strongly used by backend for chat endpt but required by schema
+            let body = ChatRequest(text: text, history: historyToSend, mode: self.currentMode)
             
             let response: ChatResponse = try await APIClient.shared.request(
                 endpoint: .chat(sessionId: sessionId),

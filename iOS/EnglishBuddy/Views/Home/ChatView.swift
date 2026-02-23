@@ -18,8 +18,8 @@ struct ChatView: View {
                     // Mode Selector Bar
                     Button(action: { showModeMenu = true }) {
                         HStack {
-                            Image(systemName: "graduationcap.fill")
-                            Text("IELTS Mode")
+                            Image(systemName: vm.currentMode == "ielts" ? "graduationcap.fill" : vm.currentMode == "daily" ? "cup.and.saucer.fill" : "briefcase.fill")
+                            Text(vm.currentMode == "ielts" ? "IELTS Mode" : vm.currentMode == "daily" ? "Daily Talk" : "Interview")
                             Image(systemName: "chevron.down")
                         }
                         .font(.subheadline.bold())
@@ -40,7 +40,7 @@ struct ChatView: View {
                                         Image(systemName: "mic.bubble.fill")
                                             .font(.system(size: 60))
                                             .foregroundColor(.gray)
-                                        Text("Hold the microphone below to speak, or type a message.")
+                                        Text("Tap the microphone below to speak, or type a message.")
                                             .multilineTextAlignment(.center)
                                             .foregroundColor(.secondary)
                                     }

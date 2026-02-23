@@ -18,19 +18,27 @@ class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
     }
     
     func requestAuthorization() {
-        SFSpeechRecognizer.requestAuthorization { authStatus in
-            DispatchQueue.main.async {
-                switch authStatus {
-                case .authorized:
-                    break
-                case .denied:
-                    self.errorMsg = "Speech recognition authorization denied"
-                case .restricted:
-                    self.errorMsg = "Speech recognition restricted on this device"
-                case .notDetermined:
-                    self.errorMsg = "Speech recognition not determined"
-                @unknown default:
-                    self.errorMsg = "Unknown authorization error"
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            if granted {
+                SFSpeechRecognizer.requestAuthorization { authStatus in
+                    DispatchQueue.main.async {
+                        switch authStatus {
+                        case .authorized:
+                            break
+                        case .denied:
+                            self.errorMsg = "Speech recognition authorization denied"
+                        case .restricted:
+                            self.errorMsg = "Speech recognition restricted on this device"
+                        case .notDetermined:
+                            self.errorMsg = "Speech recognition not determined"
+                        @unknown default:
+                            self.errorMsg = "Unknown authorization error"
+                        }
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.errorMsg = "Microphone permission denied"
                 }
             }
         }
@@ -65,7 +73,7 @@ class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
         self.transcript = ""
         
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
         try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         
         let inputNode = audioEngine.inputNode
