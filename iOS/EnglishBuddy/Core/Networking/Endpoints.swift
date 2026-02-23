@@ -17,11 +17,11 @@ enum APIEndpoint {
         case .register:
             return URL(string: "\(APIEndpoint.baseURL)/auth/register")!
         case .createSession:
-            return URL(string: "\(APIEndpoint.baseURL)/sessions/")!
+            return URL(string: "\(APIEndpoint.baseURL)/sessions")!
         case .chat(let sessionId):
             return URL(string: "\(APIEndpoint.baseURL)/chat/\(sessionId)/message")!
         case .getSessions:
-            return URL(string: "\(APIEndpoint.baseURL)/sessions/")!
+            return URL(string: "\(APIEndpoint.baseURL)/sessions")!
         case .getReport(let sessionId):
             return URL(string: "\(APIEndpoint.baseURL)/report/\(sessionId)")!
         }
