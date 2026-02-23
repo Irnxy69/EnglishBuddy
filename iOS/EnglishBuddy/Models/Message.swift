@@ -17,9 +17,17 @@ struct Message: Codable, Identifiable {
 }
 
 struct ChatRequest: Encodable {
-    let text: String
+    let sessionId: String
+    let userText: String
     let history: [Message]
     let mode: String
+    
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "session_id"
+        case userText = "user_text"
+        case history
+        case mode
+    }
 }
 
 struct ChatResponse: Decodable {

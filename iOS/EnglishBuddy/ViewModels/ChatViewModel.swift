@@ -86,12 +86,17 @@ class ChatViewModel: ObservableObject {
         do {
             // Context window: send all previous messages except the new one we just appended
             let historyToSend = Array(messages.dropLast())
-            let body = ChatRequest(text: text, history: historyToSend, mode: self.currentMode)
+            let body = ChatRequest(
+                sessionId: sessionId,
+                userText: text,
+                history: historyToSend,
+                mode: self.currentMode
+            )
             
             let response: ChatResponse = try await APIClient.shared.request(
-                endpoint: .chat(sessionId: sessionId),
+                endpoint: .chat,
                 method: "POST",
-                body: ["text": body.text, "history": body.history.map { ["role": $0.role.rawValue, "content": $0.content] }, "mode": body.mode]
+                body: ["session_id": body.sessionId, "user_text": body.userText, "history": body.history.map { ["role": $0.role.rawValue, "content": $0.content] }, "mode": body.mode]
             )
             
             let aiMessage = Message(role: .assistant, content: response.reply)

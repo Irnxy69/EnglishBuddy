@@ -6,7 +6,7 @@ enum APIEndpoint {
     case login
     case register
     case createSession(mode: String)
-    case chat(sessionId: String)
+    case chat
     case getSessions
     case getReport(sessionId: String)
     
@@ -18,8 +18,8 @@ enum APIEndpoint {
             return URL(string: "\(APIEndpoint.baseURL)/auth/register")!
         case .createSession:
             return URL(string: "\(APIEndpoint.baseURL)/sessions")!
-        case .chat(let sessionId):
-            return URL(string: "\(APIEndpoint.baseURL)/chat/\(sessionId)/message")!
+        case .chat:
+            return URL(string: "\(APIEndpoint.baseURL)/chat")!
         case .getSessions:
             return URL(string: "\(APIEndpoint.baseURL)/sessions")!
         case .getReport(let sessionId):
