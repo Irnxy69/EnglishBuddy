@@ -1,0 +1,24 @@
+name: EnglishBuddy
+options:
+  bundleIdPrefix: com.englishbuddy
+targets:
+  EnglishBuddy:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources: [EnglishBuddy]
+    info:
+      path: EnglishBuddy/Info.plist
+      properties:
+        UILaunchStoryboardName: LaunchScreen
+        NSMicrophoneUsageDescription: "EnglishBuddy needs microphone access to record your speech for practice sessions."
+        NSSpeechRecognitionUsageDescription: "EnglishBuddy uses speech recognition to transcribe your spoken English."
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIRequiredDeviceCapabilities:
+          - armv7
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        LSRequiresIPhoneOS: true
