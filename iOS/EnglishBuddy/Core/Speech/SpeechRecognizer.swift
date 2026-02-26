@@ -6,6 +6,7 @@ class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
     @Published var transcript = ""
     @Published var isRecording = false
     @Published var errorMsg: String?
+    @Published var isPermissionDenied = false
     
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -24,11 +25,10 @@ class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
                     DispatchQueue.main.async {
                         switch authStatus {
                         case .authorized:
-                            break
-                        case .denied:
-                            self.errorMsg = "Speech recognition authorization denied"
-                        case .restricted:
-                            self.errorMsg = "Speech recognition restricted on this device"
+                            self.isPermissionDenied = false
+                        case .denied, .restricted:
+                            self.errorMsg = "Speech recognition access denied"
+                            self.isPermissionDenied = true
                         case .notDetermined:
                             self.errorMsg = "Speech recognition not determined"
                         @unknown default:
@@ -39,6 +39,7 @@ class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
             } else {
                 DispatchQueue.main.async {
                     self.errorMsg = "Microphone permission denied"
+                    self.isPermissionDenied = true
                 }
             }
         }

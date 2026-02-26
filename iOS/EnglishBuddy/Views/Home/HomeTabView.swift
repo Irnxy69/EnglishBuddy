@@ -2,10 +2,12 @@ import SwiftUI
 
 struct HomeTabView: View {
     @EnvironmentObject var authVM: AuthViewModel
+    @StateObject private var chatVM = ChatViewModel()
     
     var body: some View {
         TabView {
             ChatView()
+                .environmentObject(chatVM)
                 .tabItem {
                     Label("Practice", systemImage: "mic.bubble.fill")
                 }

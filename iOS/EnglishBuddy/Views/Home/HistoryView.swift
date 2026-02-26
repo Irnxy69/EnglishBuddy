@@ -9,7 +9,11 @@ struct HistoryView: View {
         NavigationView {
             Group {
                 if isLoading && sessions.isEmpty {
-                    ProgressView("Loading history...")
+                    List {
+                        ForEach(0..<6, id: \.self) { _ in
+                            SkeletonRow()
+                        }
+                    }
                 } else if let error = error {
                     VStack {
                         Image(systemName: "exclamationmark.triangle")
@@ -69,12 +73,44 @@ struct HistoryView: View {
         isLoading = true
         error = nil
         do {
-            sessions = try await APIClient.shared.request(endpoint: .getSessions)
+            let response: SessionsResponse = try await APIClient.shared.request(endpoint: .getSessions)
+            sessions = response.sessions
             // Sort by start time descending
             sessions.sort { $0.startTime > $1.startTime }
         } catch {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+}
+
+// Skeleton Loader
+struct SkeletonRow: View {
+    @State private var opacity: Double = 0.3
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(UIColor.tertiarySystemFill))
+                    .frame(width: 80, height: 20)
+                Spacer()
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(UIColor.tertiarySystemFill))
+                    .frame(width: 50, height: 20)
+            }
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(UIColor.tertiarySystemFill))
+                .frame(width: 140, height: 16)
+        }
+        .padding(.vertical, 8)
+        .opacity(opacity)
+        .onAppear {
+            let baseAnimation = Animation.easeInOut(duration: 0.8)
+            let repeated = baseAnimation.repeatForever(autoreverses: true)
+            withAnimation(repeated) {
+                opacity = 0.8
+            }
+        }
     }
 }

@@ -8,8 +8,17 @@ class AuthViewModel: ObservableObject {
     @Published var error: String?
     @Published var isLoading = false
     
+    private var cancellables = Set<AnyCancellable>()
+    
     init() {
         checkAuthStatus()
+        
+        NotificationCenter.default.publisher(for: NSNotification.Name("Unauthorized"))
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.logout()
+            }
+            .store(in: &cancellables)
     }
     
     func checkAuthStatus() {

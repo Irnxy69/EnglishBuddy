@@ -80,6 +80,11 @@ class ChatViewModel: ObservableObject {
         }
     }
     
+    func stopRecordingAndCancel() {
+        speechRecognizer.stopTranscribing()
+        speechRecognizer.transcript = ""
+    }
+    
     func sendMessage(text: String) async {
         guard let sessionId = currentSessionId, !text.isEmpty else { return }
         

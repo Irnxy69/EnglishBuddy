@@ -35,6 +35,7 @@ class APIClient {
                 throw NetworkError.decodingError(error)
             }
         case 401:
+            NotificationCenter.default.post(name: NSNotification.Name("Unauthorized"), object: nil)
             throw NetworkError.unauthorized
         default:
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {

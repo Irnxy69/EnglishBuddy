@@ -2,9 +2,10 @@ import SwiftUI
 import UIKit
 
 struct ChatView: View {
-    @StateObject private var vm = ChatViewModel()
+    @EnvironmentObject private var vm: ChatViewModel
     @State private var inputText = ""
     @State private var showModeMenu = false
+    @Environment(\.scenePhase) var scenePhase
     
     // Auto-scroll anchor
     @Namespace var bottomID
@@ -87,10 +88,26 @@ struct ChatView: View {
                             Text(error)
                                 .font(.caption)
                                 .foregroundColor(.red)
+                            
                             Spacer()
-                            Button(action: { vm.error = nil; vm.speechRecognizer.errorMsg = nil }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.red)
+                            
+                            if vm.speechRecognizer.isPermissionDenied {
+                                Button("Settings") {
+                                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.red)
+                                .cornerRadius(8)
+                            } else {
+                                Button(action: { vm.error = nil; vm.speechRecognizer.errorMsg = nil }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.red)
+                                }
                             }
                         }
                         .padding()
@@ -196,6 +213,23 @@ struct ChatView: View {
                 Task { await vm.startNewSession(mode: "ielts") }
             }
         }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .background || newPhase == .inactive {
+                if vm.speechRecognizer.isRecording {
+                    vm.stopRecordingAndCancel()
+                }
+            }
+        }
+        .onChange(of: vm.error) { newError in
+            if newError != nil {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
+        .onChange(of: vm.speechRecognizer.errorMsg) { newError in
+            if newError != nil {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
     }
 }
 
@@ -225,9 +259,27 @@ struct RecordButton: View {
     let onTouchUp: () -> Void
     
     @State private var isPressed = false
+    @State private var isRippling = false
     
     var body: some View {
         ZStack {
+            // Ripple effect
+            if isPressed || isRecording {
+                Circle()
+                    .stroke(Color.red.opacity(0.4), lineWidth: 10)
+                    .frame(width: 50, height: 50)
+                    .scaleEffect(isRippling ? 2.5 : 1.0)
+                    .opacity(isRippling ? 0.0 : 1.0)
+                    .onAppear {
+                        withAnimation(.easeOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                            isRippling = true
+                        }
+                    }
+                    .onDisappear {
+                        isRippling = false
+                    }
+            }
+            
             Circle()
                 .fill(isPressed || isRecording ? Color.red : Color.indigo)
                 .frame(width: 50, height: 50)
