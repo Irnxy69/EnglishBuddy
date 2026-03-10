@@ -56,14 +56,20 @@ class AuthViewModel: ObservableObject {
         
         do {
             let body = ["email": email, "password": password]
-            let _: [String: String] = try await APIClient.shared.request(endpoint: .register, method: "POST", body: body)
+            // Backend register returns TokenResponse directly (same as login)
+            let response: TokenResponse = try await APIClient.shared.request(endpoint: .register, method: "POST", body: body)
             
-            // Auto-login after successful registration
-            await login(email: email, password: password)
+            if KeychainManager.shared.save(token: response.accessToken) {
+                currentUser = response.user
+                isAuthenticated = true
+            } else {
+                error = "Failed to save secure token"
+            }
         } catch {
             self.error = error.localizedDescription
-            isLoading = false
         }
+        
+        isLoading = false
     }
     
     func logout() {

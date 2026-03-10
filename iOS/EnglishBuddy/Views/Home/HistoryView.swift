@@ -1,9 +1,22 @@
 import SwiftUI
 
 struct HistoryView: View {
+    @EnvironmentObject var chatVM: ChatViewModel
     @State private var sessions: [PracticeSession] = []
     @State private var isLoading = false
     @State private var error: String?
+    
+    private let modeIcons: [String: String] = [
+        "ielts": "🎓",
+        "daily": "☕",
+        "interview": "💼"
+    ]
+    
+    private let modeColors: [String: Color] = [
+        "ielts": .indigo,
+        "daily": .cyan,
+        "interview": .orange
+    ]
     
     var body: some View {
         NavigationView {
@@ -15,47 +28,65 @@ struct HistoryView: View {
                         }
                     }
                 } else if let error = error {
-                    VStack {
+                    VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundColor(.orange)
                         Text(error)
                             .multilineTextAlignment(.center)
-                            .padding()
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
                         Button("Retry") {
                             Task { await loadSessions() }
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.indigo)
                     }
                 } else if sessions.isEmpty {
-                    VStack {
+                    VStack(spacing: 12) {
                         Image(systemName: "tray")
-                            .font(.largeTitle)
+                            .font(.system(size: 48))
                             .foregroundColor(.gray)
-                        Text("No sessions yet.")
+                        Text("No sessions yet")
+                            .font(.headline)
                             .foregroundColor(.secondary)
-                            .padding()
+                        Text("Start a practice session to see your history here.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
                     }
                 } else {
                     List(sessions) { session in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(session.mode.capitalized)
-                                    .font(.headline)
-                                Spacer()
-                                Text("\(session.messageCount) msgs")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color(UIColor.tertiarySystemFill))
-                                    .cornerRadius(8)
+                        Button(action: {
+                            Task {
+                                await chatVM.loadSession(sessionId: session.id)
                             }
-                            
-                            Text(session.startTime, style: .date)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                        }) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(modeIcons[session.mode] ?? "💬")
+                                    Text(session.mode.capitalized)
+                                        .font(.headline)
+                                    Spacer()
+                                    if session.endedAt != nil {
+                                        Text("Completed")
+                                            .font(.caption2)
+                                            .foregroundColor(.green)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(Color.green.opacity(0.15))
+                                            .cornerRadius(8)
+                                    }
+                                }
+                                
+                                Text(session.formattedDate)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
+                        .foregroundColor(.primary)
                     }
                     .refreshable {
                         await loadSessions()
@@ -75,8 +106,6 @@ struct HistoryView: View {
         do {
             let response: SessionsResponse = try await APIClient.shared.request(endpoint: .getSessions)
             sessions = response.sessions
-            // Sort by start time descending
-            sessions.sort { $0.startTime > $1.startTime }
         } catch {
             self.error = error.localizedDescription
         }

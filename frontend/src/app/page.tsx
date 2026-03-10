@@ -50,6 +50,7 @@ export default function Home() {
       >
         {[
           { icon: "🎙️", title: "Voice Practice", desc: "Speak naturally with AI" },
+          { icon: "⌨️", title: "Text Chat", desc: "Type or speak, your choice" },
           { icon: "📊", title: "Band Score", desc: "Instant IELTS assessment" },
           { icon: "📝", title: "Smart Feedback", desc: "Grammar & vocab upgrade" },
         ].map((f) => (

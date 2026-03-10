@@ -192,10 +192,35 @@ struct ChatView: View {
             .sheet(isPresented: $vm.showReport) {
                 NavigationView {
                     ScrollView {
-                        Text(vm.currentReport ?? "No report available.")
-                            .padding()
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Band score badge
+                            if let score = vm.currentBandScore {
+                                HStack {
+                                    Spacer()
+                                    VStack(spacing: 4) {
+                                        Text("Band Score")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(String(format: "%.1f", score))
+                                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                                            .foregroundColor(.indigo)
+                                    }
+                                    .padding()
+                                    .background(Color.indigo.opacity(0.1))
+                                    .cornerRadius(16)
+                                    Spacer()
+                                }
+                                .padding(.bottom, 8)
+                            }
+                            
+                            Text(vm.currentReport ?? "No report available.")
+                                .font(.body)
+                                .lineSpacing(4)
+                        }
+                        .padding()
                     }
                     .navigationTitle("Assessment Report")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         Button("Done") { vm.showReport = false }
                     }

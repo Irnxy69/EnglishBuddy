@@ -1,23 +1,30 @@
 import Foundation
 
-struct User: Decodable {
+struct User: Codable {
     let email: String
-    let id: UUID?
+    let userId: String
     
     enum CodingKeys: String, CodingKey {
         case email
-        case id = "user_id"
+        case userId = "user_id"
     }
 }
 
+/// Backend returns: {access_token, token_type, user_id, email}
 struct TokenResponse: Decodable {
     let accessToken: String
     let tokenType: String
-    let user: User?
+    let userId: String
+    let email: String
     
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case tokenType = "token_type"
-        case user
+        case userId = "user_id"
+        case email
+    }
+    
+    var user: User {
+        User(email: email, userId: userId)
     }
 }

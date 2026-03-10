@@ -8,7 +8,8 @@ enum APIEndpoint {
     case createSession(mode: String)
     case chat
     case getSessions
-    case getReport(sessionId: String)
+    case getSession(sessionId: String)
+    case generateReport
     
     var url: URL {
         switch self {
@@ -16,14 +17,16 @@ enum APIEndpoint {
             return URL(string: "\(APIEndpoint.baseURL)/auth/login")!
         case .register:
             return URL(string: "\(APIEndpoint.baseURL)/auth/register")!
-        case .createSession:
-            return URL(string: "\(APIEndpoint.baseURL)/sessions")!
+        case .createSession(let mode):
+            return URL(string: "\(APIEndpoint.baseURL)/sessions?mode=\(mode)")!
         case .chat:
             return URL(string: "\(APIEndpoint.baseURL)/chat")!
         case .getSessions:
             return URL(string: "\(APIEndpoint.baseURL)/sessions")!
-        case .getReport(let sessionId):
-            return URL(string: "\(APIEndpoint.baseURL)/report/\(sessionId)")!
+        case .getSession(let sessionId):
+            return URL(string: "\(APIEndpoint.baseURL)/sessions/\(sessionId)")!
+        case .generateReport:
+            return URL(string: "\(APIEndpoint.baseURL)/report/generate")!
         }
     }
 }

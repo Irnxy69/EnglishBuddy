@@ -13,16 +13,44 @@ struct HomeTabView: View {
                 }
             
             HistoryView()
+                .environmentObject(chatVM)
                 .tabItem {
                     Label("History", systemImage: "clock.fill")
                 }
             
-            // Temporary Settings/Profile tab for logout
+            // Settings / Profile
             NavigationView {
                 List {
-                    Section {
+                    Section("Account") {
                         if let user = authVM.currentUser {
-                            Text(user.email)
+                            HStack {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.indigo)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(user.email)
+                                        .font(.headline)
+                                    Text("Active account")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    
+                    Section("About") {
+                        HStack {
+                            Text("Version")
+                            Spacer()
+                            Text("1.0.0")
+                                .foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("AI Partner")
+                            Spacer()
+                            Text("Echo")
+                                .foregroundColor(.secondary)
                         }
                     }
                     
@@ -30,7 +58,10 @@ struct HomeTabView: View {
                         Button(role: .destructive) {
                             authVM.logout()
                         } label: {
-                            Text("Log Out")
+                            HStack {
+                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                                Text("Log Out")
+                            }
                         }
                     }
                 }
@@ -40,5 +71,6 @@ struct HomeTabView: View {
                 Label("Settings", systemImage: "gear")
             }
         }
+        .tint(.indigo)
     }
 }

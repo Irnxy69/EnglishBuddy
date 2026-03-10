@@ -11,6 +11,7 @@ class ChatViewModel: ObservableObject {
     
     @Published var showReport = false
     @Published var currentReport: String?
+    @Published var currentBandScore: Double?
     
     let speechRecognizer = SpeechRecognizer()
     let tts = TextToSpeech()
@@ -40,13 +41,16 @@ class ChatViewModel: ObservableObject {
         error = nil
         isAIThinking = true
         self.currentMode = mode
+        currentReport = nil
+        currentBandScore = nil
+        showReport = false
         
         do {
-            let body = ["mode": mode]
+            // Backend expects mode as query param: POST /sessions?mode=ielts
+            // No body needed - mode is in the URL via endpoint
             let response: CreateSessionResponse = try await APIClient.shared.request(
                 endpoint: .createSession(mode: mode),
-                method: "POST",
-                body: body
+                method: "POST"
             )
             self.currentSessionId = response.sessionId
         } catch {
@@ -74,7 +78,6 @@ class ChatViewModel: ObservableObject {
                     await self.sendMessage(text: userText)
                 }
             } else {
-                // If empty after 0.5s, just clear everything
                 self.speechRecognizer.transcript = ""
             }
         }
@@ -95,19 +98,18 @@ class ChatViewModel: ObservableObject {
         error = nil
         
         do {
-            // Context window: send all previous messages except the new one we just appended
             let historyToSend = Array(messages.dropLast())
-            let body = ChatRequest(
-                sessionId: sessionId,
-                userText: text,
-                history: historyToSend,
-                mode: self.currentMode
-            )
+            let body: [String: Any] = [
+                "session_id": sessionId,
+                "user_text": text,
+                "history": historyToSend.map { ["role": $0.role.rawValue, "content": $0.content] },
+                "mode": self.currentMode
+            ]
             
             let response: ChatResponse = try await APIClient.shared.request(
                 endpoint: .chat,
                 method: "POST",
-                body: ["session_id": body.sessionId, "user_text": body.userText, "history": body.history.map { ["role": $0.role.rawValue, "content": $0.content] }, "mode": body.mode]
+                body: body
             )
             
             let aiMessage = Message(role: .assistant, content: response.reply)
@@ -118,7 +120,6 @@ class ChatViewModel: ObservableObject {
             
         } catch {
             self.error = "Failed to send message: \(error.localizedDescription)"
-            // Remove the user message if it failed to send
             messages.removeLast()
         }
         
@@ -136,17 +137,53 @@ class ChatViewModel: ObservableObject {
         error = nil
         
         do {
-            let body = ["messages": messages.map { ["role": $0.role.rawValue, "content": $0.content] }]
+            // Backend: POST /report/generate with {session_id, history}
+            let body: [String: Any] = [
+                "session_id": sessionId,
+                "history": messages.map { ["role": $0.role.rawValue, "content": $0.content] }
+            ]
             let response: ReportResponse = try await APIClient.shared.request(
-                endpoint: .getReport(sessionId: sessionId),
+                endpoint: .generateReport,
                 method: "POST",
                 body: body
             )
             
             self.currentReport = response.content
+            self.currentBandScore = response.bandScore
             self.showReport = true
         } catch {
             self.error = "Failed to generate report: \(error.localizedDescription)"
+        }
+        
+        isAIThinking = false
+    }
+    
+    func loadSession(sessionId: String) async {
+        isAIThinking = true
+        error = nil
+        
+        do {
+            let response: SessionDetailResponse = try await APIClient.shared.request(
+                endpoint: .getSession(sessionId: sessionId),
+                method: "GET"
+            )
+            
+            self.currentSessionId = sessionId
+            self.currentMode = response.session.mode
+            self.messages = response.messages.map { msg in
+                Message(role: msg.role == "user" ? .user : .assistant, content: msg.content)
+            }
+            
+            if let report = response.report {
+                self.currentReport = report.content
+                self.currentBandScore = report.bandScore
+            } else {
+                self.currentReport = nil
+                self.currentBandScore = nil
+            }
+            self.showReport = false
+        } catch {
+            self.error = "Failed to load session: \(error.localizedDescription)"
         }
         
         isAIThinking = false
