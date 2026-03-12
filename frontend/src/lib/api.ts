@@ -1,6 +1,14 @@
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const LOCAL_API_URL = "http://localhost:8000";
+const REMOTE_API_URL = "https://englishbuddy.top";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || LOCAL_API_URL;
+const API_FALLBACK_URL =
+  process.env.NEXT_PUBLIC_API_FALLBACK_URL || REMOTE_API_URL;
+
+const shouldFallbackToRemote =
+  !process.env.NEXT_PUBLIC_API_URL && API_URL === LOCAL_API_URL;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -21,11 +29,26 @@ api.interceptors.request.use((config) => {
 // 401 时自动跳转登录
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       window.location.href = "/login";
     }
+
+    const originalRequest = error.config;
+    const isNetworkError = !error.response;
+    const canRetryFallback =
+      shouldFallbackToRemote &&
+      isNetworkError &&
+      originalRequest &&
+      !originalRequest.__retriedWithFallback;
+
+    if (canRetryFallback) {
+      originalRequest.__retriedWithFallback = true;
+      originalRequest.baseURL = API_FALLBACK_URL;
+      return api.request(originalRequest);
+    }
+
     return Promise.reject(error);
   },
 );
@@ -68,16 +91,30 @@ export const speechApi = {
       typeof window !== "undefined"
         ? localStorage.getItem("access_token")
         : null;
-    const response = await fetch(`${API_URL}/api/tts`, {
+    const requestOptions: RequestInit = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ text, voice }),
-    });
-    if (!response.ok) throw new Error("TTS failed");
-    return response.blob();
+    };
+
+    try {
+      const response = await fetch(`${API_URL}/api/tts`, requestOptions);
+      if (!response.ok) throw new Error("TTS failed");
+      return response.blob();
+    } catch {
+      if (!shouldFallbackToRemote) {
+        throw new Error("TTS failed");
+      }
+      const fallbackResponse = await fetch(
+        `${API_FALLBACK_URL}/api/tts`,
+        requestOptions,
+      );
+      if (!fallbackResponse.ok) throw new Error("TTS failed");
+      return fallbackResponse.blob();
+    }
   },
 };
 
