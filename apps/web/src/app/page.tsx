@@ -22,6 +22,20 @@ type ReplyMeta = {
 
 type AuthMode = "login" | "register";
 
+type AuthUser = {
+  id: string;
+  email: string;
+};
+
+type InvitationItem = {
+  code: string;
+  maxUses: number;
+  usedCount: number;
+  remainingUses: number;
+  createdAt: string;
+  isActive: boolean;
+};
+
 function resolveApiBase() {
   const configured = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").trim();
 
@@ -30,7 +44,6 @@ function resolveApiBase() {
       return window.location.origin;
     }
 
-    // Avoid mixed-content failures: if site is HTTPS, force API base to HTTPS.
     if (window.location.protocol === "https:" && configured.startsWith("http://")) {
       return configured.replace("http://", "https://");
     }
@@ -64,7 +77,9 @@ export default function HomePage() {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("demo@englishbuddy.ai");
   const [password, setPassword] = useState("123456");
+  const [invitationCode, setInvitationCode] = useState("");
   const [token, setToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -80,6 +95,11 @@ export default function HomePage() {
   const [liveConversationMode, setLiveConversationMode] = useState(false);
   const [isPlayingReply, setIsPlayingReply] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [inviteMaxUses, setInviteMaxUses] = useState("5");
+  const [invites, setInvites] = useState<InvitationItem[]>([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -87,15 +107,60 @@ export default function HomePage() {
   const speechRecognitionRef = useRef<any>(null);
   const speechSynthesisVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const liveConversationModeRef = useRef(false);
+  const isPlayingReplyRef = useRef(false);
+  const sendingRef = useRef(false);
 
-  const canSend = useMemo(() => Boolean(token && sessionId && text.trim() && wsReady && !sending), [token, sessionId, text, wsReady, sending]);
+  const canSend = useMemo(
+    () => Boolean(token && sessionId && text.trim() && wsReady && !sending),
+    [token, sessionId, text, wsReady, sending]
+  );
+
+  const isAdmin = currentUser?.id === "u_1001";
+
+  useEffect(() => {
+    sendingRef.current = sending;
+  }, [sending]);
+
+  useEffect(() => {
+    isPlayingReplyRef.current = isPlayingReply;
+  }, [isPlayingReply]);
+
+  function sendTextMessage(userText: string) {
+    if (!sessionId || !token) {
+      return;
+    }
+
+    const content = userText.trim();
+    if (!content) {
+      return;
+    }
+
+    const socket = wsRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      setError("Connection is not ready");
+      return;
+    }
+
+    setText("");
+    setSending(true);
+    setStreamingReply("");
+    setMessages((prev) => [...prev, { role: "user", content }]);
+    setError(null);
+
+    socket.send(
+      JSON.stringify({
+        event: "message.send",
+        sessionId,
+        text: content
+      })
+    );
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    // 预加载语音合成声音列表
     if ("speechSynthesis" in window) {
       const loadVoices = () => {
         const voices = window.speechSynthesis.getVoices();
@@ -103,9 +168,9 @@ export default function HomePage() {
           speechSynthesisVoicesRef.current = voices;
         }
       };
-      
-      loadVoices(); // 首次尝试加载
-      window.speechSynthesis.onvoiceschanged = loadVoices; // 监听声音列表更新
+
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
     }
 
     const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -120,41 +185,38 @@ export default function HomePage() {
 
     recognition.onresult = (event: any) => {
       const transcript = event?.results?.[0]?.[0]?.transcript;
-      if (transcript) {
+      if (!transcript) {
+        return;
+      }
+
+      if (liveConversationModeRef.current) {
+        sendTextMessage(transcript);
+      } else {
         setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        // 实时对话模式下自动发送
-        if (liveConversationModeRef.current) {
-          setTimeout(() => {
-            // 通过发送文本来触发消息发送
-            const userText = transcript.trim();
-            if (userText && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(
-                JSON.stringify({
-                  event: "message.send",
-                  sessionId,
-                  text: userText
-                })
-              );
-              setMessages((prev) => [...prev, { role: "user", content: userText }]);
-              setText("");
-              setSending(true);
-            }
-          }, 100);
-        }
       }
     };
 
     recognition.onstart = () => setVoiceListening(true);
-    recognition.onend = () => setVoiceListening(false);
+    recognition.onend = () => {
+      setVoiceListening(false);
+      if (liveConversationModeRef.current && !isPlayingReplyRef.current && !sendingRef.current) {
+        setTimeout(() => {
+          speechRecognitionRef.current?.start();
+        }, 300);
+      }
+    };
     recognition.onerror = () => setVoiceListening(false);
 
     speechRecognitionRef.current = recognition;
     setVoiceInputSupported(true);
-    
+
     return () => {
       liveConversationModeRef.current = false;
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
     };
-  }, []);
+  }, [sessionId, token]);
 
   function startVoiceInput() {
     const recognition = speechRecognitionRef.current;
@@ -166,53 +228,51 @@ export default function HomePage() {
     recognition.start();
   }
 
-  function speakText(utterance: string, autoStartListening: boolean = false) {
+  function speakText(utterance: string, autoStartListening = false) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       setError("当前浏览器不支持语音朗读");
       return;
     }
+
     const speech = new SpeechSynthesisUtterance(utterance);
     speech.lang = "en-US";
     speech.pitch = 1.0;
     speech.rate = 0.95;
     speech.volume = 1.0;
-    
-    // 使用缓存的声音列表（确保声音已加载）
-    const voices = speechSynthesisVoicesRef.current.length > 0 
-      ? speechSynthesisVoicesRef.current 
+
+    const voices = speechSynthesisVoicesRef.current.length > 0
+      ? speechSynthesisVoicesRef.current
       : window.speechSynthesis.getVoices();
-    
+
     if (voices.length > 0) {
-      // 优先选择英文女性声音（如 Google、微软、苹果的高质量声音）
-      const preferredVoice = 
-        voices.find(v => v.name.includes("Google US English Female")) ||
-        voices.find(v => v.name.includes("Google UK English Female")) ||
-        voices.find(v => v.lang.startsWith("en") && v.name.includes("Female")) ||
-        voices.find(v => v.lang.startsWith("en-US")) ||
-        voices.find(v => v.lang.startsWith("en"));
-      
+      const preferredVoice =
+        voices.find((v) => v.name.includes("Google US English Female")) ||
+        voices.find((v) => v.name.includes("Google UK English Female")) ||
+        voices.find((v) => v.lang.startsWith("en") && v.name.includes("Female")) ||
+        voices.find((v) => v.lang.startsWith("en-US")) ||
+        voices.find((v) => v.lang.startsWith("en"));
+
       if (preferredVoice) {
         speech.voice = preferredVoice;
       }
     }
-    
+
     window.speechSynthesis.cancel();
     setIsPlayingReply(true);
-    
+
     speech.onend = () => {
       setIsPlayingReply(false);
-      // 在实时对话模式下，播放完毕后自动开始下一轮识别
       if (autoStartListening && liveConversationModeRef.current && speechRecognitionRef.current) {
         setTimeout(() => {
           speechRecognitionRef.current?.start();
-        }, 500);
+        }, 400);
       }
     };
-    
+
     speech.onerror = () => {
       setIsPlayingReply(false);
     };
-    
+
     window.speechSynthesis.speak(speech);
   }
 
@@ -225,10 +285,12 @@ export default function HomePage() {
       },
       body: JSON.stringify({ scenarioId: "scn_coffee" })
     });
+
     const session = await sessionRes.json();
     if (!sessionRes.ok) {
       throw new Error(session.message ?? "创建会话失败");
     }
+
     setSessionId(session.id);
   }
 
@@ -278,6 +340,9 @@ export default function HomePage() {
           const doneMessage = payload.message;
           if (doneMessage && typeof doneMessage !== "string") {
             setMessages((prev) => [...prev, doneMessage]);
+            if (liveConversationModeRef.current && doneMessage.role === "assistant") {
+              speakText(doneMessage.content, true);
+            }
           }
           setStreamingReply("");
           if (payload.meta) {
@@ -332,6 +397,90 @@ export default function HomePage() {
     };
   }, [token]);
 
+  async function loadInvitations(authToken: string) {
+    if (!isAdmin) {
+      return;
+    }
+
+    setInviteLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/invitations/list`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message ?? "加载邀请码失败");
+      }
+      setInvites(data.codes ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载邀请码失败");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  async function generateInvitation() {
+    if (!token) {
+      return;
+    }
+
+    const maxUses = Number(inviteMaxUses);
+    if (!Number.isInteger(maxUses) || maxUses < 1) {
+      setError("使用次数必须是大于0的整数");
+      return;
+    }
+
+    setInviteLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/invitations/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ maxUses })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message ?? "生成邀请码失败");
+      }
+      await loadInvitations(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "生成邀请码失败");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  async function disableInvitation(code: string) {
+    if (!token) {
+      return;
+    }
+
+    setInviteLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/invitations/disable`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message ?? "禁用邀请码失败");
+      }
+      await loadInvitations(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "禁用邀请码失败");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
   async function handleAuthSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -339,19 +488,29 @@ export default function HomePage() {
 
     try {
       const endpoint = authMode === "login" ? "login" : "register";
+      const body = authMode === "register"
+        ? { email, password, invitationCode: invitationCode.trim().toUpperCase() }
+        : { email, password };
+
       const res = await fetch(`${API_BASE}/api/v1/auth/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? (authMode === "login" ? "登录失败" : "注册失败"));
+      if (!res.ok) {
+        throw new Error(data.message ?? (authMode === "login" ? "登录失败" : "注册失败"));
+      }
 
       setMessages([]);
       setScore(null);
       setMeta(null);
       setToken(data.accessToken);
+      setCurrentUser(data.user ?? null);
       await createSession(data.accessToken);
+      if ((data.user?.id ?? "") === "u_1001") {
+        await loadInvitations(data.accessToken);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -363,7 +522,10 @@ export default function HomePage() {
     manualCloseRef.current = true;
     wsRef.current?.close();
     wsRef.current = null;
+    liveConversationModeRef.current = false;
+    setLiveConversationMode(false);
     setToken(null);
+    setCurrentUser(null);
     setSessionId(null);
     setMessages([]);
     setStreamingReply("");
@@ -372,36 +534,16 @@ export default function HomePage() {
     setWsReady(false);
     setConnecting(false);
     setError(null);
+    setInvitationCode("");
+    setInvites([]);
   }
 
   async function sendMessage(e: FormEvent) {
     e.preventDefault();
-    if (!canSend) return;
-
-    const userText = text.trim();
-    setText("");
-    setSending(true);
-    setStreamingReply("");
-    setMessages((prev) => [...prev, { role: "user", content: userText }]);
-    setError(null);
-
-    try {
-      const socket = wsRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        throw new Error("Connection is not ready");
-      }
-
-      socket.send(
-        JSON.stringify({
-          event: "message.send",
-          sessionId,
-          text: userText
-        })
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-      setSending(false);
+    if (!canSend) {
+      return;
     }
+    sendTextMessage(text);
   }
 
   if (!token) {
@@ -422,7 +564,17 @@ export default function HomePage() {
           <form onSubmit={handleAuthSubmit} className="authForm stacked">
             <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="邮箱" type="email" />
             <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="密码（至少6位）" type="password" />
-            <button disabled={loading}>{loading ? "处理中..." : authMode === "login" ? "登录并开始" : "注册并开始"}</button>
+            {authMode === "register" ? (
+              <input
+                value={invitationCode}
+                onChange={(e) => setInvitationCode(e.target.value)}
+                placeholder="邀请码（必填）"
+                type="text"
+              />
+            ) : null}
+            <button disabled={loading || (authMode === "register" && !invitationCode.trim())}>
+              {loading ? "处理中..." : authMode === "login" ? "登录并开始" : "注册并开始"}
+            </button>
           </form>
 
           {error ? <p className="error">{error}</p> : null}
@@ -443,6 +595,36 @@ export default function HomePage() {
           <button type="button" className="secondary" onClick={handleLogout}>退出登录</button>
         </div>
       </section>
+
+      {isAdmin ? (
+        <section className="panel" style={{ marginBottom: 16 }}>
+          <h3 style={{ marginTop: 0 }}>邀请码管理</h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              value={inviteMaxUses}
+              onChange={(e) => setInviteMaxUses(e.target.value)}
+              placeholder="每个邀请码可使用次数"
+              type="number"
+              min={1}
+              style={{ maxWidth: 220 }}
+            />
+            <button type="button" onClick={generateInvitation} disabled={inviteLoading}>生成邀请码</button>
+            <button type="button" className="secondary" onClick={() => token && loadInvitations(token)} disabled={inviteLoading}>刷新列表</button>
+          </div>
+          <div style={{ marginTop: 12, overflowX: "auto" }}>
+            {invites.length === 0 ? <p className="placeholder">暂无邀请码</p> : null}
+            {invites.map((item) => (
+              <div key={item.code} style={{ display: "grid", gridTemplateColumns: "1.6fr 0.6fr 0.6fr 0.8fr 0.7fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #e6eef7", alignItems: "center" }}>
+                <strong>{item.code}</strong>
+                <span>{item.usedCount}/{item.maxUses}</span>
+                <span>{item.remainingUses}</span>
+                <span>{item.isActive ? "可用" : "已禁用"}</span>
+                <button type="button" className="tiny" disabled={!item.isActive || inviteLoading} onClick={() => disableInvitation(item.code)}>禁用</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="panel messenger">
         <div className="messages">
@@ -472,32 +654,32 @@ export default function HomePage() {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 if (canSend) {
-                  sendMessage(e as any);
+                  sendTextMessage(text);
                 }
               }
             }}
             placeholder="请输入你要说的英语..."
             disabled={!sessionId || liveConversationMode}
           />
-          <button 
-            type="button" 
-            className={liveConversationMode ? "secondary active" : "secondary"} 
+          <button
+            type="button"
+            className={liveConversationMode ? "secondary active" : "secondary"}
             onClick={() => {
               if (!liveConversationMode) {
-                // 开启实时对话
                 liveConversationModeRef.current = true;
                 setLiveConversationMode(true);
                 setText("");
                 speechRecognitionRef.current?.start();
               } else {
-                // 关闭实时对话
                 liveConversationModeRef.current = false;
                 setLiveConversationMode(false);
                 speechRecognitionRef.current?.abort();
-                window.speechSynthesis.cancel();
+                if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                  window.speechSynthesis.cancel();
+                }
               }
             }}
-            disabled={!voiceInputSupported || (liveConversationMode && (voiceListening || isPlayingReply))}
+            disabled={!voiceInputSupported}
           >
             {liveConversationMode ? (voiceListening ? "听你说..." : isPlayingReply ? "播放中..." : "实时对话中") : "开启实时对话"}
           </button>
