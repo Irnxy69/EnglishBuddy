@@ -31,6 +31,15 @@ body {
   gap: 20px;
 }
 
+.pageAuth {
+  align-content: center;
+}
+
+.pageChat {
+  max-width: 1080px;
+  gap: 14px;
+}
+
 .hero {
   animation: fadeIn 500ms ease-out;
 }
@@ -66,10 +75,52 @@ body {
   animation: fadeUp 700ms ease-out;
 }
 
+.messenger {
+  min-height: 72vh;
+  grid-template-rows: 1fr auto auto auto;
+}
+
+.authCard {
+  display: grid;
+  gap: 14px;
+  background: color-mix(in srgb, var(--card) 90%, #dcebf8);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 10px 24px rgba(31, 77, 120, 0.1);
+}
+
+.authModeSwitch {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.chatHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.chatHeader h1 {
+  margin: 6px 0 0;
+  font-size: clamp(26px, 4vw, 40px);
+}
+
+.sessionControls {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
 .authForm,
 .sendForm {
   display: grid;
   gap: 8px;
+  grid-template-columns: 1fr;
+}
+
+.authForm.stacked {
   grid-template-columns: 1fr;
 }
 
@@ -92,6 +143,28 @@ button {
   cursor: pointer;
 }
 
+.secondary {
+  background: #edf4fb;
+  border: 1px solid var(--border);
+  color: #1f4b76;
+}
+
+.secondary.active {
+  background: #dcecff;
+  border-color: #7fb2e0;
+}
+
+.tiny {
+  height: 30px;
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 12px;
+  margin-top: 8px;
+  background: #f0f6fc;
+  border: 1px solid #bfd5ea;
+  color: #2c5b86;
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -111,7 +184,8 @@ button:disabled {
 }
 
 .messages {
-  max-height: 340px;
+  min-height: 420px;
+  max-height: 62vh;
   overflow: auto;
   padding: 14px;
   display: grid;
@@ -125,6 +199,7 @@ button:disabled {
 .msg {
   border-radius: 14px;
   padding: 10px 12px;
+  max-width: min(82%, 760px);
 }
 
 .msg span {
@@ -139,15 +214,18 @@ button:disabled {
 
 .msg.user {
   background: #dbecff;
+  justify-self: end;
 }
 
 .msg.assistant {
   background: #e8f8ee;
+  justify-self: start;
 }
 
 .sendForm {
   padding: 12px;
   border-top: 1px solid var(--border);
+  grid-template-columns: 1fr auto auto;
 }
 
 .scoreGrid {
@@ -182,9 +260,23 @@ button:disabled {
   .authForm {
     grid-template-columns: 1fr 1fr auto;
   }
+}
+
+@media (max-width: 760px) {
+  .chatHeader {
+    display: grid;
+  }
+
+  .sessionControls {
+    justify-items: start;
+  }
 
   .sendForm {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
+  }
+
+  .msg {
+    max-width: 100%;
   }
 }
 
