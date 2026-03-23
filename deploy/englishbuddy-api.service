@@ -1,0 +1,17 @@
+[Unit]
+Description=EnglishBuddy API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/EnglishBuddy/services/api
+Environment=NODE_ENV=production
+Environment=DATA_STORE_MODE=postgres
+Environment=POSTGRES_URL=postgresql://postgres:postgres@127.0.0.1:5432/englishbuddy
+ExecStart=/usr/bin/node /home/ubuntu/EnglishBuddy/services/api/dist/index.js
+Restart=always
+RestartSec=3
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target

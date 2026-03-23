@@ -44,3 +44,21 @@ export interface LearningPlan {
     suggestedScenarios: string[];
   };
 }
+
+export interface Invitation {
+  code: string;
+  maxUses: number;
+  usedCount: number;
+  createdAt: string;
+  createdBy: string;
+  isActive: boolean;
+  expiresAt?: string | null;
+  note?: string | null;
+}
+
+export interface InvitationCreateInput {
+  maxUses: number;
+  createdBy: string;
+  expiresAt?: string | null;
+  note?: string | null;
+}

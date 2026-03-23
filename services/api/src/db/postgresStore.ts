@@ -1,6 +1,15 @@
 import { Pool } from "pg";
 import { DataStore } from "./contracts.js";
-import { LearningPlan, Message, Session } from "../types.js";
+import { Invitation, InvitationCreateInput, LearningPlan, Message, Session, User } from "../types.js";
+
+function randomCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let suffix = "";
+  for (let i = 0; i < 8; i++) {
+    suffix += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `BUDDY${suffix}`;
+}
 
 export function createPostgresStore(pool: Pool): DataStore {
   return {
@@ -11,6 +20,131 @@ export function createPostgresStore(pool: Pool): DataStore {
       nativeLang: "zh-CN",
       createdAt: new Date().toISOString()
     }),
+    findAuthAccountByEmail: async (email: string) => {
+      const rs = await pool.query(
+        `select u.id,
+                u.email,
+                u.cefr_level as "cefrLevel",
+                u.native_lang as "nativeLang",
+                u.created_at as "createdAt",
+                a.password
+         from users u
+         join auth_accounts a on a.user_id = u.id
+         where lower(u.email) = lower($1)
+         limit 1`,
+        [email]
+      );
+
+      if (!rs.rows[0]) {
+        return undefined;
+      }
+
+      const row = rs.rows[0] as User & { password: string };
+      return {
+        user: {
+          id: row.id,
+          email: row.email,
+          cefrLevel: row.cefrLevel,
+          nativeLang: row.nativeLang,
+          createdAt: row.createdAt
+        },
+        password: row.password
+      };
+    },
+    createAuthAccount: async (input) => {
+      await pool.query(
+        `insert into users (id, email, cefr_level, native_lang, created_at)
+         values ($1, $2, $3, $4, now())
+         on conflict (id) do nothing`,
+        [input.user.id, input.user.email.toLowerCase(), input.user.cefrLevel, input.user.nativeLang]
+      );
+
+      await pool.query(
+        `insert into auth_accounts (user_id, password)
+         values ($1, $2)
+         on conflict (user_id) do update set password = excluded.password`,
+        [input.user.id, input.password]
+      );
+    },
+    listInvitations: async () => {
+      const rs = await pool.query(
+        `select code,
+                max_uses as "maxUses",
+                used_count as "usedCount",
+                created_at as "createdAt",
+                created_by as "createdBy",
+                is_active as "isActive",
+                expires_at as "expiresAt",
+                note
+         from invitations
+         order by created_at desc`
+      );
+      return rs.rows as Invitation[];
+    },
+    createInvitation: async (input: InvitationCreateInput) => {
+      let code = randomCode();
+      for (let i = 0; i < 5; i++) {
+        const exists = await pool.query("select 1 from invitations where code = $1 limit 1", [code]);
+        if (exists.rowCount === 0) {
+          break;
+        }
+        code = randomCode();
+      }
+
+      const rs = await pool.query(
+        `insert into invitations (code, max_uses, used_count, created_by, is_active, expires_at, note)
+         values ($1, $2, 0, $3, true, $4, $5)
+         returning code,
+                   max_uses as "maxUses",
+                   used_count as "usedCount",
+                   created_at as "createdAt",
+                   created_by as "createdBy",
+                   is_active as "isActive",
+                   expires_at as "expiresAt",
+                   note`,
+        [code, input.maxUses, input.createdBy, input.expiresAt ?? null, input.note ?? null]
+      );
+      return rs.rows[0] as Invitation;
+    },
+    disableInvitation: async (code: string) => {
+      const rs = await pool.query("update invitations set is_active = false where code = upper($1)", [code]);
+      return (rs.rowCount ?? 0) > 0;
+    },
+    verifyInvitation: async (code: string) => {
+      const rs = await pool.query(
+        `select code, max_uses, used_count, is_active, expires_at
+         from invitations
+         where code = upper($1)
+         limit 1`,
+        [code]
+      );
+      const row = rs.rows[0] as { max_uses: number; used_count: number; is_active: boolean; expires_at: string | null } | undefined;
+      if (!row) {
+        return { valid: false, message: "邀请码不存在或已过期" };
+      }
+      if (!row.is_active) {
+        return { valid: false, message: "邀请码已被禁用" };
+      }
+      if (row.expires_at && Date.parse(row.expires_at) <= Date.now()) {
+        return { valid: false, message: "邀请码已过期" };
+      }
+      if (row.used_count >= row.max_uses) {
+        return { valid: false, message: "邀请码已达使用上限" };
+      }
+      return { valid: true };
+    },
+    consumeInvitation: async (code: string) => {
+      const rs = await pool.query(
+        `update invitations
+         set used_count = used_count + 1
+         where code = upper($1)
+           and is_active = true
+           and used_count < max_uses
+           and (expires_at is null or expires_at > now())`,
+        [code]
+      );
+      return (rs.rowCount ?? 0) > 0;
+    },
     getScenarios: async () => {
       const rs = await pool.query("select id,name,category,prompt_template as \"promptTemplate\",difficulty from scenarios order by name");
       return rs.rows;

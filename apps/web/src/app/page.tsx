@@ -33,7 +33,10 @@ type InvitationItem = {
   usedCount: number;
   remainingUses: number;
   createdAt: string;
+  createdBy: string;
   isActive: boolean;
+  expiresAt?: string | null;
+  note?: string | null;
 };
 
 function resolveApiBase() {
@@ -97,6 +100,8 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [inviteMaxUses, setInviteMaxUses] = useState("5");
+  const [inviteExpiresAt, setInviteExpiresAt] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
   const [invites, setInvites] = useState<InvitationItem[]>([]);
   const [inviteLoading, setInviteLoading] = useState(false);
 
@@ -398,10 +403,6 @@ export default function HomePage() {
   }, [token]);
 
   async function loadInvitations(authToken: string) {
-    if (!isAdmin) {
-      return;
-    }
-
     setInviteLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/v1/auth/invitations/list`, {
@@ -433,19 +434,26 @@ export default function HomePage() {
     setInviteLoading(true);
     setError(null);
     try {
+      const expiresAtIso = inviteExpiresAt ? new Date(inviteExpiresAt).toISOString() : null;
       const res = await fetch(`${API_BASE}/api/v1/auth/invitations/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ maxUses })
+        body: JSON.stringify({
+          maxUses,
+          expiresAt: expiresAtIso,
+          note: inviteNote.trim() || null
+        })
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.message ?? "生成邀请码失败");
       }
       await loadInvitations(token);
+      setInviteNote("");
+      setInviteExpiresAt("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "生成邀请码失败");
     } finally {
@@ -608,17 +616,35 @@ export default function HomePage() {
               min={1}
               style={{ maxWidth: 220 }}
             />
+            <input
+              value={inviteExpiresAt}
+              onChange={(e) => setInviteExpiresAt(e.target.value)}
+              type="datetime-local"
+              placeholder="过期时间（可选）"
+              style={{ maxWidth: 240 }}
+            />
+            <input
+              value={inviteNote}
+              onChange={(e) => setInviteNote(e.target.value)}
+              placeholder="备注（可选）"
+              type="text"
+              maxLength={200}
+              style={{ minWidth: 220 }}
+            />
             <button type="button" onClick={generateInvitation} disabled={inviteLoading}>生成邀请码</button>
             <button type="button" className="secondary" onClick={() => token && loadInvitations(token)} disabled={inviteLoading}>刷新列表</button>
           </div>
           <div style={{ marginTop: 12, overflowX: "auto" }}>
             {invites.length === 0 ? <p className="placeholder">暂无邀请码</p> : null}
             {invites.map((item) => (
-              <div key={item.code} style={{ display: "grid", gridTemplateColumns: "1.6fr 0.6fr 0.6fr 0.8fr 0.7fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #e6eef7", alignItems: "center" }}>
+              <div key={item.code} style={{ display: "grid", gridTemplateColumns: "1.4fr 0.6fr 0.6fr 0.8fr 0.9fr 1.2fr 1.4fr 0.7fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #e6eef7", alignItems: "center" }}>
                 <strong>{item.code}</strong>
                 <span>{item.usedCount}/{item.maxUses}</span>
                 <span>{item.remainingUses}</span>
                 <span>{item.isActive ? "可用" : "已禁用"}</span>
+                <span>{item.createdBy}</span>
+                <span>{item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "永不过期"}</span>
+                <span>{item.note || "-"}</span>
                 <button type="button" className="tiny" disabled={!item.isActive || inviteLoading} onClick={() => disableInvitation(item.code)}>禁用</button>
               </div>
             ))}
