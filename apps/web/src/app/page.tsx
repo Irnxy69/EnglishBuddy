@@ -133,6 +133,26 @@ export default function HomePage() {
     }
     const speech = new SpeechSynthesisUtterance(utterance);
     speech.lang = "en-US";
+    speech.pitch = 1.0;
+    speech.rate = 0.95;
+    speech.volume = 1.0;
+    
+    // 选择一个自然的英文女性声音
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      // 优先选择英文女性声音（如 Google、微软、苹果的高质量声音）
+      const preferredVoice = 
+        voices.find(v => v.name.includes("Google US English Female")) ||
+        voices.find(v => v.name.includes("Google UK English Female")) ||
+        voices.find(v => v.lang.startsWith("en") && v.name.includes("Female")) ||
+        voices.find(v => v.lang.startsWith("en-US")) ||
+        voices.find(v => v.lang.startsWith("en"));
+      
+      if (preferredVoice) {
+        speech.voice = preferredVoice;
+      }
+    }
+    
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(speech);
   }
