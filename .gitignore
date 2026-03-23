@@ -22,6 +22,33 @@ out/
 *.log
 .DS_Store
 
+# iOS / Xcode
+iOS/EnglishBuddy.xcodeproj/xcuserdata/
+iOS/EnglishBuddy.xcodeproj/project.xcworkspace/xcuserdata/
+iOS/DerivedData/
+iOS/*.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# React Native / Expo
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/npm-debug.*
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+mobile/*.orig.*
+mobile/web-build/
+
 # IDE
 .idea/
 .vscode/
@@ -30,3 +57,4 @@ out/
 # Secrets (NEVER commit these!)
 backend/.env
 frontend/.env.local
+

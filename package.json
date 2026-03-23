@@ -1,0 +1,27 @@
+{
+  "name": "english-buddy",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w services/api\" \"npm run dev -w apps/web\"",
+    "dev:all": "concurrently \"npm run dev -w services/api\" \"npm run dev -w services/speech\" \"npm run dev -w apps/web\"",
+    "dev:mobile": "npm run dev -w apps/mobile",
+    "db:migrate": "npm run migrate -w services/api",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "typescript": "^5.8.2"
+  },  
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+

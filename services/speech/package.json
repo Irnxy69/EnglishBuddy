@@ -1,0 +1,8 @@
+{
+  "name": "@englishbuddy/speech",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "python3 -m uvicorn app.main:app --reload --port 8002"
+  }
+}
