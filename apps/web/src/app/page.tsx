@@ -409,6 +409,14 @@ export default function HomePage() {
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (canSend) {
+                  sendMessage(e as any);
+                }
+              }
+            }}
             placeholder="请输入你要说的英语..."
             disabled={!sessionId}
           />
