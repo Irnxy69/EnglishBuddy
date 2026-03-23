@@ -77,6 +77,8 @@ export default function HomePage() {
   const [connecting, setConnecting] = useState(false);
   const [voiceInputSupported, setVoiceInputSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [liveConversationMode, setLiveConversationMode] = useState(false);
+  const [isPlayingReply, setIsPlayingReply] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,6 +86,7 @@ export default function HomePage() {
   const manualCloseRef = useRef(false);
   const speechRecognitionRef = useRef<any>(null);
   const speechSynthesisVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const liveConversationModeRef = useRef(false);
 
   const canSend = useMemo(() => Boolean(token && sessionId && text.trim() && wsReady && !sending), [token, sessionId, text, wsReady, sending]);
 
@@ -119,6 +122,25 @@ export default function HomePage() {
       const transcript = event?.results?.[0]?.[0]?.transcript;
       if (transcript) {
         setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        // 实时对话模式下自动发送
+        if (liveConversationModeRef.current) {
+          setTimeout(() => {
+            // 通过发送文本来触发消息发送
+            const userText = transcript.trim();
+            if (userText && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.send(
+                JSON.stringify({
+                  event: "message.send",
+                  sessionId,
+                  text: userText
+                })
+              );
+              setMessages((prev) => [...prev, { role: "user", content: userText }]);
+              setText("");
+              setSending(true);
+            }
+          }, 100);
+        }
       }
     };
 
@@ -128,6 +150,10 @@ export default function HomePage() {
 
     speechRecognitionRef.current = recognition;
     setVoiceInputSupported(true);
+    
+    return () => {
+      liveConversationModeRef.current = false;
+    };
   }, []);
 
   function startVoiceInput() {
@@ -140,7 +166,7 @@ export default function HomePage() {
     recognition.start();
   }
 
-  function speakText(utterance: string) {
+  function speakText(utterance: string, autoStartListening: boolean = false) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       setError("当前浏览器不支持语音朗读");
       return;
@@ -171,6 +197,22 @@ export default function HomePage() {
     }
     
     window.speechSynthesis.cancel();
+    setIsPlayingReply(true);
+    
+    speech.onend = () => {
+      setIsPlayingReply(false);
+      // 在实时对话模式下，播放完毕后自动开始下一轮识别
+      if (autoStartListening && liveConversationModeRef.current && speechRecognitionRef.current) {
+        setTimeout(() => {
+          speechRecognitionRef.current?.start();
+        }, 500);
+      }
+    };
+    
+    speech.onerror = () => {
+      setIsPlayingReply(false);
+    };
+    
     window.speechSynthesis.speak(speech);
   }
 
@@ -410,7 +452,7 @@ export default function HomePage() {
               <span>{msg.role === "user" ? "你" : "教练"}</span>
               <p>{msg.content}</p>
               {msg.role === "assistant" ? (
-                <button type="button" className="tiny" onClick={() => speakText(msg.content)}>朗读</button>
+                <button type="button" className="tiny" onClick={() => speakText(msg.content, liveConversationMode)}>朗读</button>
               ) : null}
             </article>
           ))}
@@ -435,12 +477,34 @@ export default function HomePage() {
               }
             }}
             placeholder="请输入你要说的英语..."
-            disabled={!sessionId}
+            disabled={!sessionId || liveConversationMode}
           />
-          <button type="button" className="secondary" onClick={startVoiceInput} disabled={!voiceInputSupported || voiceListening}>
+          <button 
+            type="button" 
+            className={liveConversationMode ? "secondary active" : "secondary"} 
+            onClick={() => {
+              if (!liveConversationMode) {
+                // 开启实时对话
+                liveConversationModeRef.current = true;
+                setLiveConversationMode(true);
+                setText("");
+                speechRecognitionRef.current?.start();
+              } else {
+                // 关闭实时对话
+                liveConversationModeRef.current = false;
+                setLiveConversationMode(false);
+                speechRecognitionRef.current?.abort();
+                window.speechSynthesis.cancel();
+              }
+            }}
+            disabled={!voiceInputSupported || (liveConversationMode && (voiceListening || isPlayingReply))}
+          >
+            {liveConversationMode ? (voiceListening ? "听你说..." : isPlayingReply ? "播放中..." : "实时对话中") : "开启实时对话"}
+          </button>
+          <button type="button" className="secondary" onClick={startVoiceInput} disabled={!voiceInputSupported || voiceListening || liveConversationMode}>
             {voiceListening ? "收音中..." : "语音输入"}
           </button>
-          <button disabled={!canSend}>{sending ? "发送中..." : "发送"}</button>
+          <button disabled={!canSend || liveConversationMode}>{sending ? "发送中..." : "发送"}</button>
         </form>
 
         {score ? (
