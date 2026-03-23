@@ -39,6 +39,8 @@ type InvitationItem = {
   note?: string | null;
 };
 
+type InviteFilter = "all" | "active" | "disabled" | "expired";
+
 function resolveApiBase() {
   const configured = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").trim();
 
@@ -104,6 +106,8 @@ export default function HomePage() {
   const [inviteNote, setInviteNote] = useState("");
   const [invites, setInvites] = useState<InvitationItem[]>([]);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteFilter, setInviteFilter] = useState<InviteFilter>("all");
+  const [copiedInviteCode, setCopiedInviteCode] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,6 +125,29 @@ export default function HomePage() {
   );
 
   const isAdmin = currentUser?.id === "u_1001";
+
+  const filteredInvites = useMemo(() => {
+    const isExpired = (item: InvitationItem) => {
+      if (!item.expiresAt) {
+        return false;
+      }
+      return Date.parse(item.expiresAt) <= Date.now();
+    };
+
+    if (inviteFilter === "all") {
+      return invites;
+    }
+
+    if (inviteFilter === "active") {
+      return invites.filter((item) => item.isActive && !isExpired(item));
+    }
+
+    if (inviteFilter === "disabled") {
+      return invites.filter((item) => !item.isActive);
+    }
+
+    return invites.filter((item) => isExpired(item));
+  }, [invites, inviteFilter]);
 
   useEffect(() => {
     sendingRef.current = sending;
@@ -489,6 +516,25 @@ export default function HomePage() {
     }
   }
 
+  async function copyInvitationCode(code: string) {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = code;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedInviteCode(code);
+      setTimeout(() => setCopiedInviteCode(""), 1200);
+    } catch {
+      setError("复制邀请码失败，请手动复制");
+    }
+  }
+
   async function handleAuthSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -633,11 +679,17 @@ export default function HomePage() {
             />
             <button type="button" onClick={generateInvitation} disabled={inviteLoading}>生成邀请码</button>
             <button type="button" className="secondary" onClick={() => token && loadInvitations(token)} disabled={inviteLoading}>刷新列表</button>
+            <select value={inviteFilter} onChange={(e) => setInviteFilter(e.target.value as InviteFilter)}>
+              <option value="all">全部</option>
+              <option value="active">可用</option>
+              <option value="disabled">已禁用</option>
+              <option value="expired">已过期</option>
+            </select>
           </div>
           <div style={{ marginTop: 12, overflowX: "auto" }}>
-            {invites.length === 0 ? <p className="placeholder">暂无邀请码</p> : null}
-            {invites.map((item) => (
-              <div key={item.code} style={{ display: "grid", gridTemplateColumns: "1.4fr 0.6fr 0.6fr 0.8fr 0.9fr 1.2fr 1.4fr 0.7fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #e6eef7", alignItems: "center" }}>
+            {filteredInvites.length === 0 ? <p className="placeholder">当前筛选下暂无邀请码</p> : null}
+            {filteredInvites.map((item) => (
+              <div key={item.code} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.5fr 0.5fr 0.7fr 0.8fr 1.1fr 1.2fr 0.6fr 0.6fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #e6eef7", alignItems: "center" }}>
                 <strong>{item.code}</strong>
                 <span>{item.usedCount}/{item.maxUses}</span>
                 <span>{item.remainingUses}</span>
@@ -645,6 +697,7 @@ export default function HomePage() {
                 <span>{item.createdBy}</span>
                 <span>{item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "永不过期"}</span>
                 <span>{item.note || "-"}</span>
+                <button type="button" className="tiny" onClick={() => copyInvitationCode(item.code)}>{copiedInviteCode === item.code ? "已复制" : "复制"}</button>
                 <button type="button" className="tiny" disabled={!item.isActive || inviteLoading} onClick={() => disableInvitation(item.code)}>禁用</button>
               </div>
             ))}
