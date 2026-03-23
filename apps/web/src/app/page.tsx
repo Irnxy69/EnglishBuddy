@@ -83,12 +83,26 @@ export default function HomePage() {
   const reconnectAttemptRef = useRef(0);
   const manualCloseRef = useRef(false);
   const speechRecognitionRef = useRef<any>(null);
+  const speechSynthesisVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
   const canSend = useMemo(() => Boolean(token && sessionId && text.trim() && wsReady && !sending), [token, sessionId, text, wsReady, sending]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
+    }
+
+    // 预加载语音合成声音列表
+    if ("speechSynthesis" in window) {
+      const loadVoices = () => {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          speechSynthesisVoicesRef.current = voices;
+        }
+      };
+      
+      loadVoices(); // 首次尝试加载
+      window.speechSynthesis.onvoiceschanged = loadVoices; // 监听声音列表更新
     }
 
     const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -137,8 +151,11 @@ export default function HomePage() {
     speech.rate = 0.95;
     speech.volume = 1.0;
     
-    // 选择一个自然的英文女性声音
-    const voices = window.speechSynthesis.getVoices();
+    // 使用缓存的声音列表（确保声音已加载）
+    const voices = speechSynthesisVoicesRef.current.length > 0 
+      ? speechSynthesisVoicesRef.current 
+      : window.speechSynthesis.getVoices();
+    
     if (voices.length > 0) {
       // 优先选择英文女性声音（如 Google、微软、苹果的高质量声音）
       const preferredVoice = 
