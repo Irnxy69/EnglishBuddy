@@ -20,7 +20,26 @@ type ReplyMeta = {
   routeReason: string;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001";
+function resolveApiBase() {
+  const configured = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").trim();
+
+  if (typeof window !== "undefined") {
+    if (!configured) {
+      return window.location.origin;
+    }
+
+    // Avoid mixed-content failures: if site is HTTPS, force API base to HTTPS.
+    if (window.location.protocol === "https:" && configured.startsWith("http://")) {
+      return configured.replace("http://", "https://");
+    }
+
+    return configured;
+  }
+
+  return configured || "http://127.0.0.1:8001";
+}
+
+const API_BASE = resolveApiBase();
 const WS_BASE = API_BASE.replace("http://", "ws://").replace("https://", "wss://");
 
 export default function HomePage() {
