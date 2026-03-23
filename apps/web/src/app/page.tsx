@@ -39,8 +39,24 @@ function resolveApiBase() {
   return configured || "http://127.0.0.1:8001";
 }
 
+function resolveWsBase(apiBase: string) {
+  const configured = (process.env.NEXT_PUBLIC_WS_BASE_URL ?? "").trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (typeof window !== "undefined") {
+    const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (!isLocalHost) {
+      return `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
+    }
+  }
+
+  return apiBase.replace("http://", "ws://").replace("https://", "wss://");
+}
+
 const API_BASE = resolveApiBase();
-const WS_BASE = API_BASE.replace("http://", "ws://").replace("https://", "wss://");
+const WS_BASE = resolveWsBase(API_BASE);
 
 export default function HomePage() {
   const [email, setEmail] = useState("demo@englishbuddy.ai");
